@@ -12,6 +12,8 @@ Finally, please manually copy text file together with image into 1 folder. (Easi
 
 import os
 from os import walk, getcwd
+import json
+
 from PIL import Image
 
 def convert(size, box):
@@ -26,8 +28,8 @@ def convert(size, box):
     y = y*dh
     h = h*dh
     return (x,y,w,h)
-    
-    
+
+
 """-------------------------------------------------------------------""" 
 
 """ Configure Paths"""   
@@ -43,50 +45,44 @@ json_name_list = []
 for file in os.listdir(mypath):
     if file.endswith(".json"):
         json_name_list.append(file)
-    
 
 """ Process """
 for json_name in json_name_list:
-    txt_name = json_name.rstrip(".json") + ".txt"
-    """ Open input text files """
-    txt_path = mypath + json_name
-    print("Input:" + txt_path)
-    txt_file = open(txt_path, "r")
+    json_path = mypath + json_name
+    print("Input:" + json_path)
+    json_data = json.load(open(json_path, 'r'))
     
     """ Open output text files """
+    txt_name = json_name.rstrip(".json") + ".txt"
     txt_outpath = outpath + txt_name
     print("Output:" + txt_outpath)
     txt_outfile = open(txt_outpath, "a")
 
     """ Convert the data to YOLO format """ 
-    lines = txt_file.read().split('\r\n')   #for ubuntu, use "\r\n" instead of "\n"
-    for idx, line in enumerate(lines):
-        if ("lineColor" in line):
-            break 	#skip reading after find lineColor
-        if ("label" in line):
-            x1 = float(lines[idx+5].rstrip(','))
-            y1 = float(lines[idx+6])
-            x2 = float(lines[idx+9].rstrip(','))
-            y2 = float(lines[idx+10])
-            cls = line[16:17]
+    for shape in json_data['shapes']:
 
-	    #in case when labelling, points are not in the right order
-	    xmin = min(x1,x2)
-	    xmax = max(x1,x2)
-     	    ymin = min(y1,y2)
-	    ymax = max(y1,y2)
-            img_path = str('%s/dataset/%s.jpg'%(wd, os.path.splitext(json_name)[0]))
+        points = shape['points']
+        x1 = float(points[0][0])
+        y1 = float(points[0][1])
+        x2 = float(points[1][0])
+        y2 = float(points[1][1])
 
-            im=Image.open(img_path)
-            w= int(im.size[0])
-            h= int(im.size[1])
+        label = shape['label']
 
-            print(w, h)
-            print(xmin, xmax, ymin, ymax)
-            b = (xmin, xmax, ymin, ymax)
-            bb = convert((w,h), b)
-            print(bb)
-            txt_outfile.write(cls + " " + " ".join([str(a) for a in bb]) + '\n')
+        #in case when labelling, points are not in the right order
+        xmin = min(x1,x2)
+        xmax = max(x1,x2)
+        ymin = min(y1,y2)
+        ymax = max(y1,y2)
+        img_path = str('%s/dataset/%s.png'%(wd, os.path.splitext(json_name)[0]))
 
-    os.rename(txt_path,json_backup+json_name)	#move json file to backup folder
-  
+        im = Image.open(img_path)
+        w = int(im.size[0])
+        h = int(im.size[1])
+
+        print(w, h)
+        print(xmin, xmax, ymin, ymax)
+        b = (xmin, xmax, ymin, ymax)
+        bb = convert((w,h), b)
+        print(bb)
+        txt_outfile.write(label + " " + " ".join([str(a) for a in bb]) + '\n')
